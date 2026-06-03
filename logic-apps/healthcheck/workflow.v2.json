@@ -27,7 +27,7 @@
             "workflow": "healthcheck",
             "timestamp": "@{utcNow()}",
             "deployedVia": "GitHub Actions CI/CD",
-            "note": "This is the v3 deployment — zero downtime slot swap confirmed"
+            "note": "This is the v2 deployment — zero downtime slot swap confirmed"
           }
         },
         "runAfter": {}
