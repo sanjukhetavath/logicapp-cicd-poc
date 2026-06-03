@@ -33,10 +33,10 @@ jobs:
           echo "All JSON files valid."
 
   # ─────────────────────────────────────────────
-  # JOB 2: Deploy to staging slot
+  # JOB 2: Deploy to staging Logic App
   # ─────────────────────────────────────────────
   deploy-staging:
-    name: Deploy to staging slot
+    name: Deploy to staging
     needs: validate
     runs-on: ubuntu-latest
     environment: staging
@@ -52,14 +52,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Ensure staging slot exists
-        run: |
-          az functionapp deployment slot create \
-            --name ${{ secrets.LOGIC_APP_NAME }} \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --slot staging \
-            2>/dev/null || echo "Staging slot already exists, continuing."
-
       - name: Zip workflow files
         run: |
           cd logic-apps
@@ -67,31 +59,42 @@ jobs:
           echo "Package contents:"
           unzip -l ../logicapp-deploy.zip
 
-      - name: Deploy ZIP to staging slot
+      - name: Deploy ZIP to staging Logic App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.LOGIC_APP_NAME }}
-          slot-name: staging
+          app-name: ${{ secrets.STAGING_LOGIC_APP_NAME }}
           package: logicapp-deploy.zip
 
-      - name: Wait for staging slot to warm up
+      - name: Wait for staging to warm up
         run: sleep 20
 
-      - name: Confirm staging deploy succeeded
+      - name: Get staging callback URL for testing
         run: |
-          echo "Staging slot deploy complete - workflows are ready."
-          echo "Proceeding to production approval gate."
+          echo "======================================================"
+          echo " STAGING DEPLOY COMPLETE"
+          echo " Test your staging workflows at:"
+          echo " https://portal.azure.com → la-poc-staging → Workflows"
+          echo ""
+          CALLBACK=$(az rest \
+            --method POST \
+            --uri "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ secrets.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${{ secrets.STAGING_LOGIC_APP_NAME }}/hostruntime/runtime/webhooks/workflow/api/management/workflows/healthcheck/triggers/manual/listCallbackUrl?api-version=2022-03-01" \
+            --query value -o tsv 2>/dev/null || echo "URL not available yet")
+          echo " Staging healthcheck URL: $CALLBACK"
+          echo "======================================================"
 
   # ─────────────────────────────────────────────
-  # JOB 3: Swap staging → production (requires approval)
+  # JOB 3: Deploy to production (requires approval)
   # ─────────────────────────────────────────────
-  swap-to-production:
-    name: Swap staging to production
+  deploy-production:
+    name: Deploy to production
     needs: deploy-staging
     runs-on: ubuntu-latest
-    environment: production   # <-- this triggers the manual approval gate
+    environment: production   # <-- manual approval gate
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
@@ -99,31 +102,28 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Swap staging slot → production
+      - name: Zip workflow files
         run: |
-          echo "Swapping staging → production..."
-          az functionapp deployment slot swap \
-            --name ${{ secrets.LOGIC_APP_NAME }} \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --slot staging \
-            --target-slot production
-          echo "Swap complete. Production is now running the new version."
+          cd logic-apps
+          zip -r ../logicapp-deploy.zip .
 
-      - name: Post-swap smoke test — production
+      - name: Deploy ZIP to production Logic App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.LOGIC_APP_NAME }}
+          package: logicapp-deploy.zip
+
+      - name: Wait for production to warm up
+        run: sleep 20
+
+      - name: Smoke test — production healthcheck
         run: |
-          echo "Running post-swap smoke test on production slot..."
-
+          echo "Running smoke test on production..."
           CALLBACK=$(az rest \
             --method POST \
             --uri "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ secrets.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${{ secrets.LOGIC_APP_NAME }}/hostruntime/runtime/webhooks/workflow/api/management/workflows/healthcheck/triggers/manual/listCallbackUrl?api-version=2022-03-01" \
             --query value -o tsv)
-
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$CALLBACK")
-          echo "Production response status: $STATUS"
-
-          if [ "$STATUS" != "200" ]; then
-            echo "Post-swap smoke test FAILED — consider rolling back"
-            echo "Run: az functionapp deployment slot swap --name ${{ secrets.LOGIC_APP_NAME }} --resource-group ${{ secrets.RESOURCE_GROUP }} --slot staging --target-slot production"
-            exit 1
-          fi
+          echo "Production response: $STATUS"
+          [ "$STATUS" = "200" ] || { echo "Smoke test FAILED"; exit 1; }
           echo "Production is healthy. Deployment complete."
