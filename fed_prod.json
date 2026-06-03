@@ -1,0 +1,1 @@
+﻿{"name":"github-actions-production-env","issuer":"https://token.actions.githubusercontent.com","subject":"repo:sanjukhetavath/logicapp-cicd-poc:environment:production","audiences":["api://AzureADTokenExchange"]}
