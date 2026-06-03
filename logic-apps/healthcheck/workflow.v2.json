@@ -1,0 +1,38 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {},
+          "method": "GET"
+        }
+      }
+    },
+    "actions": {
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "status": "healthy",
+            "version": "v2",
+            "workflow": "healthcheck",
+            "timestamp": "@{utcNow()}",
+            "deployedVia": "GitHub Actions CI/CD",
+            "note": "This is the v2 deployment — zero downtime slot swap confirmed"
+          }
+        },
+        "runAfter": {}
+      }
+    }
+  },
+  "kind": "Stateless"
+}
