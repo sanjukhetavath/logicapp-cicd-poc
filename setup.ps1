@@ -78,6 +78,18 @@ az functionapp deployment slot create `
   --output none
 Write-Host "    OK: staging slot created" -ForegroundColor Green
 
+# ── 5b. Set APP_KIND on staging slot ─────────────────────────
+# Required for Logic App Standard slots to be recognised as workflow apps
+Write-Host ""
+Write-Host "==> Setting APP_KIND on staging slot..." -ForegroundColor Cyan
+az logicapp config appsettings set `
+  --name $LOGIC_APP `
+  --resource-group $RESOURCE_GROUP `
+  --slot staging `
+  --settings APP_KIND=workflowapp `
+  --output none
+Write-Host "    OK: APP_KIND=workflowapp set on staging slot" -ForegroundColor Green
+
 # ── 6. Entra ID app registration ─────────────────────────────
 Write-Host ""
 Write-Host "==> Creating Entra ID app registration..." -ForegroundColor Cyan
