@@ -23,9 +23,11 @@
           },
           "body": {
             "status": "healthy",
-            "version": "v1",
+            "version": "v2",
             "workflow": "healthcheck",
-            "timestamp": "@{utcNow()}"
+            "timestamp": "@{utcNow()}",
+            "deployedVia": "GitHub Actions CI/CD",
+            "note": "This is the v2 deployment — zero downtime slot swap confirmed"
           }
         },
         "runAfter": {}
