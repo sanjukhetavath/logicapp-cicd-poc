@@ -23,11 +23,11 @@
           },
           "body": {
             "status": "healthy",
-            "version": "v3",
+            "version": "v4",
             "workflow": "healthcheck",
             "timestamp": "@{utcNow()}",
             "deployedVia": "GitHub Actions CI/CD",
-            "note": "This is the v3 deployment — zero downtime slot swap confirmed"
+            "note": "This is the v4 deployment — zero downtime slot swap confirmed"
           }
         },
         "runAfter": {}
